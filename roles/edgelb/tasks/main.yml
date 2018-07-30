@@ -1,0 +1,110 @@
+---
+# TODO: Checks for dcos-cli and dcos-enterprise-cli
+
+- name: Create a working directory
+  file: path=~/edgelb-files state=directory mode=0755
+
+- name: Add EdgeLB package repositories – EdgeLB 
+  command: dcos package repo add --index=0 edgelb {{ edgelb_repo_url }}
+
+- name: Add EdgeLB package repositories – EdgeLB pool
+  command: dcos package repo add --index=0 edgelb-pool {{ edgelb_pool_repo_url }}
+
+- debug:
+    msg: "Create a Service Account"
+
+- name: Create a key pair
+  command: dcos security org service-accounts keypair edge-lb-private-key.pem edge-lb-public-key.pem
+  args:
+    chdir: ~/edgelb-files
+
+- name: Create the principal
+  command: dcos security org service-accounts create -p edge-lb-public-key.pem -d "Edge-LB service account" edge-lb-principal
+  args:
+    chdir: ~/edgelb-files
+
+- name: Create a secret
+  command: dcos security secrets create-sa-secret --strict edge-lb-private-key.pem edge-lb-principal dcos-edgelb/edge-lb-secret
+  args:
+    chdir: ~/edgelb-files
+
+- debug:
+    msg: "Create and assign permissions"
+
+- name: Add service account to superusers
+  command: dcos security org groups add_user superusers edge-lb-principal 
+  when: edgelb_principal_is_superuser == 1
+
+- name: Grant permissions to EdgeLB service account | dcos:adminrouter:service:marathon 
+  command: dcos security org users grant edge-lb-principal dcos:adminrouter:service:marathon full
+  when: edgelb_principal_is_superuser == False
+
+- name: Grant permissions to EdgeLB service account | dcos:adminrouter:package 
+  command: dcos security org users grant edge-lb-principal dcos:adminrouter:package full
+  when: edgelb_principal_is_superuser == False
+
+- name: Grant permissions to EdgeLB service account | dcos:adminrouter:service:edgelb 
+  command: dcos security org users grant edge-lb-principal dcos:adminrouter:service:edgelb full
+  when: edgelb_principal_is_superuser == False
+
+- name: Grant permissions to EdgeLB service account | dcos:service:marathon:marathon:services:/dcos-edgelb 
+  command: dcos security org users grant edge-lb-principal dcos:service:marathon:marathon:services:/dcos-edgelb full
+  when: edgelb_principal_is_superuser == False
+
+- name: Grant permissions to EdgeLB service account | dcos:mesos:master:endpoint:path:/api/v1
+  command: dcos security org users grant edge-lb-principal dcos:mesos:master:endpoint:path:/api/v1 full
+  when: edgelb_principal_is_superuser == False
+
+- name: Grant permissions to EdgeLB service account | dcos:mesos:master:endpoint:path:/api/v1/scheduler
+  command: dcos security org users grant edge-lb-principal dcos:mesos:master:endpoint:path:/api/v1/scheduler full
+  when: edgelb_principal_is_superuser == False
+
+- name: Grant permissions to EdgeLB service account | dcos:mesos:master:framework:principal:edge-lb-principal
+  command: dcos security org users grant edge-lb-principal dcos:mesos:master:framework:principal:edge-lb-principal full
+  when: edgelb_principal_is_superuser == False
+
+- name: Grant permissions to EdgeLB service account | dcos:mesos:master:framework:role
+  command: dcos security org users grant edge-lb-principal dcos:mesos:master:framework:role full
+  when: edgelb_principal_is_superuser == False
+
+- name: Grant permissions to EdgeLB service account | dcos:mesos:master:reservation:principal:edge-lb-principal
+  command: dcos security org users grant edge-lb-principal dcos:mesos:master:reservation:principal:edge-lb-principal full
+  when: edgelb_principal_is_superuser == False
+
+- name: Grant permissions to EdgeLB service account | dcos:mesos:master:reservation:role
+  command: dcos security org users grant edge-lb-principal dcos:mesos:master:reservation:role full
+  when: edgelb_principal_is_superuser == False
+
+- name: Grant permissions to EdgeLB service account | dcos:mesos:master:volume:principal:edge-lb-principal
+  command: dcos security org users grant edge-lb-principal dcos:mesos:master:volume:principal:edge-lb-principal full
+  when: edgelb_principal_is_superuser == False
+
+- name: Grant permissions to EdgeLB service account | dcos:mesos:master:volume:role
+  command: dcos security org users grant edge-lb-principal dcos:mesos:master:volume:role full
+  when: edgelb_principal_is_superuser == False
+
+- name: Grant permissions to EdgeLB service account | dcos:mesos:master:task:user:root
+  command: dcos security org users grant edge-lb-principal dcos:mesos:master:task:user:root full
+  when: edgelb_principal_is_superuser == False
+
+- name: Grant permissions to EdgeLB service account | dcos:mesos:master:task:app_id
+  command: dcos security org users grant edge-lb-principal dcos:mesos:master:task:app_id full
+  when: edgelb_principal_is_superuser == False
+
+- name: Create a configuration file 
+  template:
+    src: edge-lb-options.json 
+    dest: ~/edgelb-files/edge-lb-options.json
+
+- name: Install EdgeLB
+  shell: dcos package install --options=edge-lb-options.json edgelb --yes
+  args:
+    chdir: ~/edgelb-files
+
+- debug:
+    msg: "EdgeLB is installed!"
+
+- name: Additional configuration for limited rights principal
+  debug:
+    msg: "Don't forget to grant this permission for each EdgeLB pool created! dcos security org users grant edge-lb-principal dcos:adminrouter:service:dcos-edgelb/pools/<POOL-NAME> full"
+  when: edgelb_principal_is_superuser == False

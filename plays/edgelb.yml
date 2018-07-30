@@ -1,0 +1,5 @@
+---
+- name: Install EdgeLB
+  hosts: cli-host
+  roles:
+    - edgelb

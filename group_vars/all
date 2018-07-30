@@ -1,0 +1,10 @@
+dcos_security: permissive
+
+#Download URL for EdgeLB
+edgelb_repo_url: <URL>
+
+#Download URL for EdgeLB Pool
+edgelb_pool_repo_url: <URL>
+
+# EdgeLB service account created will be a superuser or a limited user with specific rights set?
+edgelb_principal_is_superuser: False
